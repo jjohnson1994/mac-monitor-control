@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 APP="build/External Brightness.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-swiftc -O Sources/*.swift -framework IOKit -framework AppKit -o "$APP/Contents/MacOS/ExternalBrightness"
+swiftc -O Sources/*.swift -target arm64-apple-macos13.0 -framework IOKit -framework AppKit -o "$APP/Contents/MacOS/ExternalBrightness"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -13,7 +13,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>com.jamesjohnson.externalbrightness</string>
   <key>CFBundleExecutable</key><string>ExternalBrightness</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION:-1.0}</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
 </dict></plist>

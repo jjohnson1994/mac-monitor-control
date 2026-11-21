@@ -1,0 +1,58 @@
+name: main
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: main-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-26 # pinned so the Swift toolchain changes only on purpose
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the version counts the commits on main
+          persist-credentials: false
+      - id: version
+        run: echo "version=1.0.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+      - run: ./build.sh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+      - run: ditto -c -k --keepParent "build/External Brightness.app" "ExternalBrightness-$VERSION.zip"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app
+          path: ExternalBrightness-*.zip
+          if-no-files-found: error
+          retention-days: 7
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # creates the tag and the release
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app
+      - run: | # a rerun re-uploads; a tag that points at another commit stops the release
+          existing=$(gh api "repos/$GH_REPO/git/matching-refs/tags/v$VERSION" --jq ".[] | select(.ref == \"refs/tags/v$VERSION\") | .object.sha")
+          if [ -z "$existing" ]; then
+            gh release create "v$VERSION" "ExternalBrightness-$VERSION.zip" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
+          elif [ "$existing" = "$GITHUB_SHA" ]; then
+            gh release upload "v$VERSION" "ExternalBrightness-$VERSION.zip" --clobber
+          else
+            echo "::error::tag v$VERSION points at $existing, not $GITHUB_SHA"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
